@@ -1,5 +1,5 @@
-const CACHE_NAME = 'bachat-v5';
-const ASSETS = [
+const CACHE_NAME = 'bachat-v6'; // <-- Incremented version
+const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
     '/manifest.json',
@@ -15,53 +15,57 @@ const ASSETS = [
     '/icons/icon-512.png'
 ];
 
-// 1. Install Event: Pre-cache static assets
+// Install event: cache the "app shell"
 self.addEventListener('install', (evt) => {
     evt.waitUntil((async () => {
         const cache = await caches.open(CACHE_NAME);
         console.log('Caching shell assets');
-        const results = await Promise.allSettled(
-            ASSETS.map((asset) => cache.add(asset))
-        );
-        results.forEach((result, index) => {
-            if (result.status === 'rejected') {
-                console.warn('Failed to cache', ASSETS[index], result.reason);
-            }
-        });
+        await cache.addAll(ASSETS_TO_CACHE);
     })());
-    self.skipWaiting(); // Force active SW
+    self.skipWaiting();
 });
 
-// 2. Activate Event: Clean up old caches and claim clients
+// Activate event: clean up old caches
 self.addEventListener('activate', (evt) => {
     evt.waitUntil(
-        Promise.all([
-            caches.keys().then((keys) => {
-                return Promise.all(keys
-                    .filter(key => key !== CACHE_NAME)
-                    .map(key => caches.delete(key))
-                );
-            }),
-            self.clients.claim() // Take control immediately
-        ])
+        caches.keys().then((keys) => {
+            return Promise.all(keys
+                .filter(key => key !== CACHE_NAME)
+                .map(key => caches.delete(key))
+            );
+        }).then(() => self.clients.claim())
     );
 });
 
-// 3. Fetch Event: Cache-first with index.html fallback for navigation
+// Fetch event: serve from cache, with network fallback and offline support
 self.addEventListener('fetch', (evt) => {
+    // For navigation requests, use a network-first strategy, falling back to cache
+    if (evt.request.mode === 'navigate') {
+        evt.respondWith(
+            (async () => {
+                try {
+                    // Try the network first
+                    const networkResponse = await fetch(evt.request);
+                    return networkResponse;
+                } catch (error) {
+                    // If the network fails, serve the offline page from the cache
+                    console.log('Network request failed, serving offline page from cache.');
+                    const cache = await caches.open(CACHE_NAME);
+                    return await cache.match('/index.html');
+                }
+            })()
+        );
+        return; // End execution for navigation requests
+    }
+
+    // For other requests (CSS, JS, images), use a cache-first strategy
     evt.respondWith(
         caches.match(evt.request).then((cacheRes) => {
-            // Return cached resource if found
-            if (cacheRes) {
-                return cacheRes;
-            }
-
-            // Fallback to network
-            return fetch(evt.request).catch(() => {
-                // If network fails and it's a navigation request, return index.html
-                if (evt.request.mode === 'navigate') {
-                    return caches.match('/index.html');
-                }
+            return cacheRes || fetch(evt.request).catch(() => {
+                // This part is crucial for non-navigation offline fallbacks.
+                // If you have a placeholder for images or data, you can return it here.
+                // For now, we simply let the request fail, which is often acceptable for non-critical assets.
+                console.warn('Failed to fetch from network and not in cache:', evt.request.url);
             });
         })
     );
