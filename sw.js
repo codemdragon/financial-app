@@ -17,12 +17,18 @@ const ASSETS = [
 
 // 1. Install Event: Pre-cache static assets
 self.addEventListener('install', (evt) => {
-    evt.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            console.log('Caching shell assets');
-            return cache.addAll(ASSETS);
-        })
-    );
+    evt.waitUntil((async () => {
+        const cache = await caches.open(CACHE_NAME);
+        console.log('Caching shell assets');
+        const results = await Promise.allSettled(
+            ASSETS.map((asset) => cache.add(asset))
+        );
+        results.forEach((result, index) => {
+            if (result.status === 'rejected') {
+                console.warn('Failed to cache', ASSETS[index], result.reason);
+            }
+        });
+    })());
     self.skipWaiting(); // Force active SW
 });
 
