@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bachat - Financial Companion</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        emerald: { 50: '#ecfdf5', 100: '#d1fae5', 500: '#10b981', 600: '#059669', 700: '#047857', 800: '#065f46', 900: '#064e3b' },
+                        gray: { 750: '#2d3748', 850: '#1a202c', 900: '#111827' } // Custom dark shades
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+        }
+
+        /* Hide scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Navigation Active State */
+        .nav-item.active { color: #059669; }
+        .dark .nav-item.active { color: #34d399; }
+        .nav-item.active svg { stroke-width: 2.5px; }
+
+        /* Chat Bubbles */
+        .chat-user {
+            background-color: #059669;
+            color: white;
+            border-radius: 18px 18px 0 18px;
+        }
+        .chat-ai {
+            background-color: #ffffff;
+            color: #1f2937;
+            border: 1px solid #e5e7eb;
+            border-radius: 18px 18px 18px 0;
+        }
+        .dark .chat-ai {
+            background-color: #1f2937; /* Gray-800 */
+            color: #f3f4f6; /* Gray-100 */
+            border-color: #374151; /* Gray-700 */
+        }
+
+        /* Loader */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #059669;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        .dark .loader {
+            border-color: #374151;
+            border-top-color: #34d399;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Pie Chart */
+        .pie-chart {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: conic-gradient(#e5e7eb 0% 100%);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
+
+    <!-- Top Header -->
+    <header class="bg-white dark:bg-gray-800 shadow-sm z-20 flex-none transition-colors duration-200">
+        <div class="flex justify-between items-center px-4 py-3">
+            <div class="flex items-center gap-2">
+                <div class="bg-emerald-600 p-1.5 rounded-lg text-white">
+                    <i data-lucide="wallet" class="w-5 h-5"></i>
+                </div>
+                <h1 class="text-xl font-bold text-emerald-800 dark:text-emerald-400 tracking-tight">Bachat</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="toggleDarkMode()" class="p-2 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-yellow-300 transition-all">
+                    <i data-lucide="moon" class="w-4 h-4 dark:hidden"></i>
+                    <i data-lucide="sun" class="w-4 h-4 hidden dark:block"></i>
+                </button>
+                <button onclick="openSettings()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main id="main-container" class="flex-1 overflow-y-auto relative no-scrollbar pb-20">
+        
+        <!-- DASHBOARD VIEW -->
+        <div id="view-dashboard" class="view-section min-h-full p-4 space-y-5">
+            
+            <!-- Timeframe Filter -->
+            <div class="flex justify-end">
+                <select id="time-filter" onchange="updateTimeFilter(this.value)" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm rounded-lg px-3 py-1.5 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-gray-200">
+                    <option value="thisMonth">This Month</option>
+                    <option value="lastMonth">Last Month</option>
+                    <option value="thisYear">This Year</option>
+                    <option value="all">All Time</option>
+                </select>
+            </div>
+
+            <!-- Balance Card -->
+            <div class="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10">
+                    <i data-lucide="trending-up" class="w-24 h-24"></i>
+                </div>
+                <p class="text-emerald-100 text-sm font-medium">Total Balance (Filtered)</p>
+                <h2 class="text-3xl font-bold mt-1" id="total-balance">Rs. 0</h2>
+                
+                <div class="flex mt-6 gap-4">
+                    <div class="flex-1 bg-white/10 rounded-lg p-2 backdrop-blur-sm">
+                        <div class="flex items-center gap-1 text-emerald-100 text-xs mb-1">
+                            <i data-lucide="arrow-down-circle" class="w-3 h-3"></i> Income
+                        </div>
+                        <p class="font-semibold" id="total-income">Rs. 0</p>
+                    </div>
+                    <div class="flex-1 bg-white/10 rounded-lg p-2 backdrop-blur-sm">
+                        <div class="flex items-center gap-1 text-red-200 text-xs mb-1">
+                            <i data-lucide="arrow-up-circle" class="w-3 h-3"></i> Expense
+                        </div>
+                        <p class="font-semibold" id="total-expense">Rs. 0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Spend Meter (New) -->
+            <div id="daily-spend-card" class="bg-indigo-50 dark:bg-gray-800/50 border border-indigo-100 dark:border-gray-700 p-4 rounded-xl flex items-center justify-between">
+                <div>
+                    <h3 class="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide">Daily Safe Spend</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">To stay within income this month</p>
+                </div>
+                <div class="text-right">
+                    <span class="text-2xl font-bold text-indigo-700 dark:text-indigo-300" id="daily-spend-amount">Rs. 0</span>
+                    <p class="text-[10px] text-indigo-400 dark:text-indigo-500 font-medium">/ day</p>
+                </div>
+            </div>
+
+            <!-- Quick Add Buttons -->
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="openTransactionModal('income')" class="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-center gap-2 active:bg-gray-50 dark:active:bg-gray-700 transition-colors">
+                    <i data-lucide="plus" class="text-emerald-600 dark:text-emerald-400 w-5 h-5"></i>
+                    <span class="font-medium text-gray-700 dark:text-gray-200">Add Income</span>
+                </button>
+                <button onclick="openTransactionModal('expense')" class="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center justify-center gap-2 active:bg-gray-50 dark:active:bg-gray-700 transition-colors">
+                    <i data-lucide="minus" class="text-red-500 dark:text-red-400 w-5 h-5"></i>
+                    <span class="font-medium text-gray-700 dark:text-gray-200">Add Expense</span>
+                </button>
+            </div>
+
+            <!-- Top Spending Categories (New) -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+                <h3 class="font-bold text-gray-800 dark:text-white mb-3 text-sm">Top Expenses</h3>
+                <div id="top-expenses-list" class="space-y-3">
+                    <!-- Injected via JS -->
+                    <p class="text-xs text-gray-400 italic">No expense data for this period.</p>
+                </div>
+            </div>
+
+            <!-- Recent Transactions -->
+            <div>
+                <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-3">Recent Transactions</h3>
+                <div id="transaction-list" class="space-y-3 pb-4">
+                    <!-- Transactions injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ANALYTICS VIEW -->
+        <div id="view-analytics" class="view-section hidden p-4 space-y-4">
+            <div class="flex justify-between items-center mb-2">
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Analytics</h2>
+                <div class="text-xs bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 px-2 py-1 rounded-md font-medium" id="analytics-filter-label">This Month</div>
+            </div>
+            
+            <!-- Expense Breakdown Card -->
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <h3 class="font-bold text-gray-700 dark:text-gray-200 mb-4">Expense Breakdown</h3>
+                <div class="flex items-center gap-6">
+                    <div id="expense-pie-chart" class="pie-chart flex-none relative transition-all">
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="bg-white dark:bg-gray-800 w-20 h-20 rounded-full flex items-center justify-center text-xs text-gray-400 shadow-inner">
+                                Total
+                            </div>
+                        </div>
+                    </div>
+                    <div id="expense-legend" class="flex-1 space-y-2 text-sm">
+                        <!-- Legend Items -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Income vs Expense Bar Chart -->
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <h3 class="font-bold text-gray-700 dark:text-gray-200 mb-6">Income vs Expense</h3>
+                <div class="flex items-end justify-center gap-8 h-40 pb-2 border-b border-gray-100 dark:border-gray-700" id="bar-chart-container">
+                    <!-- Bars injected via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- GOALS VIEW -->
+        <div id="view-goals" class="view-section hidden p-4 space-y-4">
+            <div class="flex justify-between items-end">
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Savings Goals</h2>
+                <button onclick="openGoalModal()" class="text-emerald-600 dark:text-emerald-400 font-medium text-sm flex items-center gap-1">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i> New Goal
+                </button>
+            </div>
+
+            <div id="goals-list" class="space-y-4"></div>
+            
+            <div id="motivational-quote" class="mt-8 bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-xl border border-yellow-100 dark:border-yellow-900/50 text-center">
+                <p class="text-yellow-800 dark:text-yellow-200 italic text-sm">"Do not save what is left after spending, but spend what is left after saving."</p>
+                <p class="text-yellow-600 dark:text-yellow-400 text-xs mt-2 font-bold">- Warren Buffett</p>
+            </div>
+        </div>
+
+        <!-- AI ADVISOR VIEW -->
+        <div id="view-ai" class="view-section hidden flex flex-col h-full">
+            <div class="bg-emerald-50 dark:bg-gray-800 p-3 border-b border-emerald-100 dark:border-gray-700 flex items-center gap-3">
+                <div class="bg-white dark:bg-gray-700 p-2 rounded-full shadow-sm">
+                    <i data-lucide="bot" class="text-emerald-600 dark:text-emerald-400 w-6 h-6"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-gray-800 dark:text-white">Financial Advisor</h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Ask about jobs, business, or saving.</p>
+                </div>
+            </div>
+
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
+                <div class="flex flex-col items-start max-w-[85%]">
+                    <div class="chat-ai p-3 text-sm shadow-sm">
+                        Hello! I am your AI Financial Advisor. You can ask me how to save money, find job opportunities in Karachi, or start a small business. How can I help you today?
+                    </div>
+                    <span class="text-[10px] text-gray-400 mt-1 ml-1">Just now</span>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-3 border-t border-gray-200 dark:border-gray-700 flex items-end gap-2">
+                <textarea id="ai-input" rows="1" class="flex-1 bg-gray-100 dark:bg-gray-700 border-0 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 dark:text-white resize-none max-h-24" placeholder="Ask anything..."></textarea>
+                <button onclick="sendAIMessage()" class="p-3 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 shadow-md">
+                    <i data-lucide="send" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- COMMUNITY VIEW -->
+        <div id="view-community" class="view-section hidden p-4 space-y-4">
+            <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4">Success Stories</h2>
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700">
+                <div class="bg-gray-200 dark:bg-gray-700 h-48 flex items-center justify-center relative">
+                    <i data-lucide="play-circle" class="w-16 h-16 text-white opacity-80"></i>
+                    <img src="https://images.unsplash.com/photo-1556740758-90de374c12ad?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" class="absolute inset-0 w-full h-full object-cover opacity-90 mix-blend-overlay">
+                </div>
+                <div class="p-4">
+                    <h3 class="font-bold text-lg dark:text-white">Ali's Journey: From Debt to Shop Owner</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Karachi, Sindh</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-300 mt-2 line-clamp-2">Ali used the 50/30/20 rule to clear his loan and open a small kiryana store in Orangi Town.</p>
+                </div>
+            </div>
+             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700">
+                <div class="bg-gray-200 dark:bg-gray-700 h-48 flex items-center justify-center relative">
+                    <i data-lucide="play-circle" class="w-16 h-16 text-white opacity-80"></i>
+                    <img src="https://images.unsplash.com/photo-1542744173-8e7e53415bb0?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" class="absolute inset-0 w-full h-full object-cover opacity-90 mix-blend-overlay">
+                </div>
+                <div class="p-4">
+                    <h3 class="font-bold text-lg dark:text-white">Sara's Savings for Education</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Hyderabad, Sindh</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-300 mt-2 line-clamp-2">How a university student managed her freelance income to pay her own tuition fees.</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 fixed bottom-0 w-full z-30 pb-safe transition-colors duration-200">
+        <div class="flex justify-between items-center h-16 px-1">
+            <button onclick="navigateTo('dashboard')" class="nav-item active flex flex-col items-center justify-center w-full h-full text-gray-400 dark:text-gray-500" id="nav-dashboard">
+                <i data-lucide="layout-dashboard" class="w-5 h-5 mb-1"></i>
+                <span class="text-[9px] font-medium">Home</span>
+            </button>
+             <button onclick="navigateTo('analytics')" class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-400 dark:text-gray-500" id="nav-analytics">
+                <i data-lucide="pie-chart" class="w-5 h-5 mb-1"></i>
+                <span class="text-[9px] font-medium">Stats</span>
+            </button>
+            <button onclick="navigateTo('ai')" class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-400 dark:text-gray-500" id="nav-ai">
+                <div class="bg-emerald-100 dark:bg-emerald-900 p-2 rounded-full -mt-6 border-4 border-gray-50 dark:border-gray-900">
+                    <i data-lucide="bot" class="w-6 h-6 text-emerald-600 dark:text-emerald-400"></i>
+                </div>
+                <span class="text-[9px] font-medium text-emerald-700 dark:text-emerald-400">AI Help</span>
+            </button>
+            <button onclick="navigateTo('goals')" class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-400 dark:text-gray-500" id="nav-goals">
+                <i data-lucide="target" class="w-5 h-5 mb-1"></i>
+                <span class="text-[9px] font-medium">Goals</span>
+            </button>
+            <button onclick="navigateTo('community')" class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-400 dark:text-gray-500" id="nav-community">
+                <i data-lucide="users" class="w-5 h-5 mb-1"></i>
+                <span class="text-[9px] font-medium">Community</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- MODALS -->
+
+    <!-- Transaction Modal -->
+    <div id="transaction-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-sm p-5 animate-bounce-in shadow-2xl">
+            <h3 class="text-lg font-bold mb-4 dark:text-white" id="t-modal-title">Add Transaction</h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount (Rs)</label>
+                    <input type="number" id="t-amount" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg p-3 text-lg focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="0">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                    <div class="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto" id="category-grid">
+                        <!-- Filled by JS -->
+                    </div>
+                    <div id="new-category-input" class="hidden mt-2 flex gap-2">
+                        <input type="text" id="new-cat-name" class="flex-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg p-2 text-sm" placeholder="New Category Name">
+                        <button onclick="addNewCategory()" class="bg-emerald-600 text-white px-3 rounded-lg text-sm">Add</button>
+                    </div>
+                    <input type="hidden" id="t-category">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+                    <input type="date" id="t-date" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg p-2">
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button onclick="closeModal('transaction-modal')" class="flex-1 py-3 text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 rounded-lg">Cancel</button>
+                <button onclick="saveTransaction()" class="flex-1 py-3 text-white font-medium bg-emerald-600 rounded-lg">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Goal Modal -->
+    <div id="goal-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
+            <h3 class="text-lg font-bold mb-4 dark:text-white">Set Savings Goal</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Goal Name</label>
+                    <input type="text" id="g-name" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg p-2" placeholder="e.g., Bike, Wedding">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Amount (Rs)</label>
+                    <input type="number" id="g-target" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg p-2" placeholder="0">
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="closeModal('goal-modal')" class="flex-1 py-3 text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 rounded-lg">Cancel</button>
+                <button onclick="saveGoal()" class="flex-1 py-3 text-white font-medium bg-emerald-600 rounded-lg">Create Goal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
+            <h3 class="text-lg font-bold mb-4 dark:text-white">Settings</h3>
+            <div class="space-y-4">
+                <button onclick="exportData()" class="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-emerald-50 dark:hover:bg-gray-600">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="download" class="text-emerald-600 dark:text-emerald-400 w-5 h-5"></i>
+                        <div class="text-left">
+                            <span class="block font-medium text-sm text-gray-800 dark:text-white">Backup Data</span>
+                            <span class="block text-xs text-gray-500 dark:text-gray-400">Download your data as JSON</span>
+                        </div>
+                    </div>
+                </button>
+                <div class="p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg text-xs text-emerald-800 dark:text-emerald-200">
+                    <p>App Version: 1.2.0 (Bachat)</p>
+                    <p class="mt-1">Data is stored locally on this device.</p>
+                </div>
+            </div>
+            <button onclick="closeModal('settings-modal')" class="w-full mt-6 py-3 text-gray-600 dark:text-gray-300 font-medium bg-gray-100 dark:bg-gray-700 rounded-lg">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. CONFIGURATION & STATE ---
+        let currentType = 'expense';
+        let db;
+        let timeFilter = 'thisMonth'; // thisMonth, lastMonth, thisYear, all
+        const DB_NAME = 'BachatDB';
+        const DB_VERSION = 1;
+
+        // Default categories
+        const defaultCategories = {
+            expense: [
+                { id: 'food', name: 'Food', icon: 'utensils' },
+                { id: 'transport', name: 'Transport', icon: 'bus' },
+                { id: 'rent', name: 'Rent', icon: 'home' },
+                { id: 'health', name: 'Health', icon: 'heart-pulse' },
+                { id: 'education', name: 'Education', icon: 'graduation-cap' },
+                { id: 'bills', name: 'Utilities', icon: 'zap' }
+            ],
+            income: [
+                { id: 'salary', name: 'Salary', icon: 'briefcase' },
+                { id: 'business', name: 'Business', icon: 'store' },
+                { id: 'crops', name: 'Crops/Farm', icon: 'wheat' }
+            ]
+        };
+
+        let categories = JSON.parse(localStorage.getItem('bachat_categories')) || defaultCategories;
+        const chartColors = ['#059669', '#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5', '#065f46', '#047857'];
+
+        // --- 2. DARK MODE LOGIC ---
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            }
+            lucide.createIcons();
+        }
+
+        function initTheme() {
+            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+
+        // --- 3. FILTER LOGIC ---
+        function updateTimeFilter(val) {
+            timeFilter = val;
+            
+            // Update UI Labels if needed
+            const label = document.getElementById('analytics-filter-label');
+            if(label) label.innerText = document.querySelector(`#time-filter option[value="${val}"]`).text;
+
+            // Refresh Views
+            const activeView = document.querySelector('.view-section:not(.hidden)').id;
+            if(activeView === 'view-dashboard') loadDashboard();
+            if(activeView === 'view-analytics') loadAnalytics();
+        }
+
+        function filterTransactions(txs) {
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+
+            return txs.filter(tx => {
+                const date = new Date(tx.date);
+                const txYear = date.getFullYear();
+                const txMonth = date.getMonth();
+
+                if (timeFilter === 'all') return true;
+                if (timeFilter === 'thisYear') return txYear === currentYear;
+                if (timeFilter === 'thisMonth') return txYear === currentYear && txMonth === currentMonth;
+                if (timeFilter === 'lastMonth') {
+                    // Handle Jan transition
+                    const targetMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+                    const targetYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+                    return txYear === targetYear && txMonth === targetMonth;
+                }
+                return true;
+            });
+        }
+
+        // --- 4. INDEXEDDB HELPER ---
+        const initDB = () => {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onerror = (e) => reject('DB Error');
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('transactions')) {
+                        const store = db.createObjectStore('transactions', { keyPath: 'id', autoIncrement: true });
+                        store.createIndex('date', 'date', { unique: false });
+                    }
+                    if (!db.objectStoreNames.contains('goals')) {
+                        db.createObjectStore('goals', { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+                request.onsuccess = (e) => {
+                    db = e.target.result;
+                    resolve(db);
+                };
+            });
+        };
+
+        const addRecord = (storeName, data) => new Promise((resolve) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            tx.objectStore(storeName).add(data);
+            tx.oncomplete = () => resolve();
+        });
+
+        const getAllRecords = (storeName) => new Promise((resolve) => {
+            const tx = db.transaction(storeName, 'readonly');
+            const request = tx.objectStore(storeName).getAll();
+            request.onsuccess = () => resolve(request.result);
+        });
+
+        const deleteRecord = (storeName, id) => new Promise((resolve) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            tx.objectStore(storeName).delete(id);
+            tx.oncomplete = () => resolve();
+        });
+
+        // --- 5. UI LOGIC & EXPORT ---
+        function openSettings() { document.getElementById('settings-modal').classList.remove('hidden'); }
+        
+        async function exportData() {
+            const txs = await getAllRecords('transactions');
+            const goals = await getAllRecords('goals');
+            const data = { transactions: txs, goals: goals, exportedAt: new Date().toISOString() };
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type : 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `bachat_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        }
+
+        function navigateTo(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${viewId}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(`nav-${viewId}`).classList.add('active');
+            lucide.createIcons();
+            if(viewId === 'dashboard') loadDashboard();
+            if(viewId === 'goals') loadGoals();
+            if(viewId === 'analytics') loadAnalytics();
+        }
+
+        // --- 6. DASHBOARD & FEATURES ---
+        function openTransactionModal(type) {
+            currentType = type;
+            document.getElementById('transaction-modal').classList.remove('hidden');
+            document.getElementById('t-modal-title').innerText = type === 'income' ? 'Add Income' : 'Add Expense';
+            document.getElementById('t-amount').value = '';
+            document.getElementById('t-date').valueAsDate = new Date();
+            document.getElementById('new-category-input').classList.add('hidden');
+            renderCategoryGrid(type);
+        }
+
+        function renderCategoryGrid(type) {
+            const grid = document.getElementById('category-grid');
+            grid.innerHTML = '';
+            categories[type].forEach(cat => {
+                const btn = document.createElement('div');
+                btn.className = 'border border-gray-200 dark:border-gray-600 rounded-lg p-2 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-50 dark:hover:bg-gray-700 transition-colors';
+                btn.innerHTML = `<i data-lucide="${cat.icon || 'tag'}" class="w-5 h-5 mb-1 text-gray-500 dark:text-gray-400"></i><span class="text-xs text-center leading-tight dark:text-gray-300">${cat.name}</span>`;
+                btn.onclick = () => {
+                    document.querySelectorAll('#category-grid > div').forEach(d => d.classList.remove('bg-emerald-100', 'border-emerald-500', 'dark:bg-emerald-900', 'dark:border-emerald-500'));
+                    btn.classList.add('bg-emerald-100', 'border-emerald-500', 'dark:bg-emerald-900', 'dark:border-emerald-500');
+                    document.getElementById('t-category').value = cat.name;
+                };
+                grid.appendChild(btn);
+            });
+            const addBtn = document.createElement('div');
+            addBtn.className = 'border border-dashed border-gray-400 dark:border-gray-500 rounded-lg p-2 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700';
+            addBtn.innerHTML = `<i data-lucide="plus" class="w-5 h-5 mb-1 text-gray-400"></i><span class="text-xs text-gray-500 dark:text-gray-400">Add New</span>`;
+            addBtn.onclick = () => {
+                document.getElementById('new-category-input').classList.remove('hidden');
+                document.getElementById('new-cat-name').focus();
+            };
+            grid.appendChild(addBtn);
+            lucide.createIcons();
+        }
+
+        function addNewCategory() {
+            const name = document.getElementById('new-cat-name').value.trim();
+            if (!name) return;
+            categories[currentType].push({ id: name.toLowerCase().replace(/\s/g, ''), name: name, icon: 'tag' });
+            localStorage.setItem('bachat_categories', JSON.stringify(categories));
+            document.getElementById('new-cat-name').value = '';
+            document.getElementById('new-category-input').classList.add('hidden');
+            renderCategoryGrid(currentType);
+        }
+
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        async function saveTransaction() {
+            const amount = parseFloat(document.getElementById('t-amount').value);
+            const category = document.getElementById('t-category').value;
+            const date = document.getElementById('t-date').value;
+            if (!amount || !category || !date) { alert("Please fill all fields"); return; }
+            await addRecord('transactions', { type: currentType, amount, category, date, timestamp: new Date().getTime() });
+            closeModal('transaction-modal');
+            loadDashboard();
+        }
+
+        async function loadDashboard() {
+            const allTxs = await getAllRecords('transactions');
+            const txs = filterTransactions(allTxs);
+            
+            let totalIncome = 0;
+            let totalExpense = 0;
+            const expenseMap = {};
+
+            txs.sort((a, b) => b.timestamp - a.timestamp);
+            
+            const listEl = document.getElementById('transaction-list');
+            listEl.innerHTML = '';
+
+            if (txs.length === 0) {
+                 listEl.innerHTML = '<div class="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">No transactions for this period.</div>';
+            }
+
+            txs.forEach(tx => {
+                if (tx.type === 'income') totalIncome += tx.amount;
+                else {
+                    totalExpense += tx.amount;
+                    expenseMap[tx.category] = (expenseMap[tx.category] || 0) + tx.amount;
+                }
+
+                const colorClass = tx.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400';
+                const bgClass = tx.type === 'income' ? 'bg-emerald-100 dark:bg-emerald-900' : 'bg-red-100 dark:bg-red-900';
+                const sign = tx.type === 'income' ? '+' : '-';
+                const icon = tx.type === 'income' ? 'arrow-down-left' : 'arrow-up-right';
+
+                const item = document.createElement('div');
+                item.className = 'bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex justify-between items-center';
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 rounded-full ${bgClass}">
+                            <i data-lucide="${icon}" class="w-4 h-4 ${colorClass}"></i>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-gray-200">${tx.category}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">${new Date(tx.date).toLocaleDateString()}</p>
+                        </div>
+                    </div>
+                    <div class="font-bold ${colorClass}">${sign} Rs.${tx.amount.toLocaleString()}</div>
+                `;
+                listEl.appendChild(item);
+            });
+
+            // Update Summaries
+            const balance = totalIncome - totalExpense;
+            document.getElementById('total-balance').innerText = `Rs. ${balance.toLocaleString()}`;
+            document.getElementById('total-income').innerText = `Rs. ${totalIncome.toLocaleString()}`;
+            document.getElementById('total-expense').innerText = `Rs. ${totalExpense.toLocaleString()}`;
+
+            // --- FEATURE: TOP 3 EXPENSES ---
+            const topExpensesList = document.getElementById('top-expenses-list');
+            topExpensesList.innerHTML = '';
+            const sortedExpenses = Object.entries(expenseMap).sort((a, b) => b[1] - a[1]).slice(0, 3);
+            
+            if(sortedExpenses.length === 0) {
+                 topExpensesList.innerHTML = '<p class="text-xs text-gray-400 italic">No expenses recorded yet.</p>';
+            } else {
+                sortedExpenses.forEach(([cat, amt], index) => {
+                    const row = document.createElement('div');
+                    row.className = "flex items-center justify-between";
+                    row.innerHTML = `
+                        <div class="flex items-center gap-2">
+                             <div class="w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xs font-bold text-gray-500 dark:text-gray-400">${index+1}</div>
+                             <span class="text-sm text-gray-700 dark:text-gray-300">${cat}</span>
+                        </div>
+                        <span class="text-sm font-bold text-gray-800 dark:text-white">Rs. ${amt.toLocaleString()}</span>
+                    `;
+                    topExpensesList.appendChild(row);
+                });
+            }
+
+            // --- FEATURE: DAILY SPEND METER ---
+            // Only relevant if viewing "This Month"
+            const dailyCard = document.getElementById('daily-spend-card');
+            if (timeFilter === 'thisMonth') {
+                dailyCard.classList.remove('hidden');
+                dailyCard.classList.add('flex');
+                
+                const now = new Date();
+                const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                const daysLeft = lastDay - now.getDate() + 1; // +1 to include today
+                
+                const remainingBudget = Math.max(0, totalIncome - totalExpense); // Simple income based budget
+                const dailySafe = remainingBudget / daysLeft;
+                
+                document.getElementById('daily-spend-amount').innerText = `Rs. ${Math.floor(dailySafe).toLocaleString()}`;
+            } else {
+                dailyCard.classList.add('hidden');
+                dailyCard.classList.remove('flex');
+            }
+
+            lucide.createIcons();
+        }
+
+        async function loadAnalytics() {
+            const allTxs = await getAllRecords('transactions');
+            const txs = filterTransactions(allTxs);
+            
+            let totalIncome = 0;
+            let totalExpense = 0;
+            const categoryTotals = {};
+
+            txs.forEach(tx => {
+                if (tx.type === 'income') totalIncome += tx.amount;
+                else {
+                    totalExpense += tx.amount;
+                    categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + tx.amount;
+                }
+            });
+
+            // Bar Chart
+            const barContainer = document.getElementById('bar-chart-container');
+            const maxVal = Math.max(totalIncome, totalExpense) || 100;
+            const incomeH = Math.max(5, (totalIncome / maxVal) * 100);
+            const expenseH = Math.max(5, (totalExpense / maxVal) * 100);
+
+            barContainer.innerHTML = `
+                <div class="flex flex-col items-center gap-1 group">
+                    <span class="text-xs font-bold text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">Rs.${totalIncome}</span>
+                    <div class="w-12 bg-emerald-500 rounded-t-md transition-all duration-500" style="height: ${incomeH}%"></div>
+                    <span class="text-xs text-gray-500 dark:text-gray-400 font-medium">Income</span>
+                </div>
+                <div class="flex flex-col items-center gap-1 group">
+                    <span class="text-xs font-bold text-gray-600 dark:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">Rs.${totalExpense}</span>
+                    <div class="w-12 bg-red-400 rounded-t-md transition-all duration-500" style="height: ${expenseH}%"></div>
+                    <span class="text-xs text-gray-500 dark:text-gray-400 font-medium">Expense</span>
+                </div>
+            `;
+
+            // Pie Chart
+            const pieChart = document.getElementById('expense-pie-chart');
+            const legend = document.getElementById('expense-legend');
+            legend.innerHTML = '';
+
+            if (totalExpense === 0) {
+                pieChart.style.background = `conic-gradient(#374151 0% 100%)`; // Dark grey for dark mode
+                if(!document.documentElement.classList.contains('dark')) pieChart.style.background = `conic-gradient(#e5e7eb 0% 100%)`;
+                
+                legend.innerHTML = '<div class="text-gray-400 text-xs italic">No expenses recorded.</div>';
+                return;
+            }
+
+            let gradientStr = '';
+            let currentDeg = 0;
+            let colorIndex = 0;
+
+            Object.keys(categoryTotals).forEach((cat) => {
+                const amount = categoryTotals[cat];
+                const pct = (amount / totalExpense) * 100;
+                const deg = (amount / totalExpense) * 360;
+                const color = chartColors[colorIndex % chartColors.length];
+                gradientStr += `${color} ${currentDeg}deg ${currentDeg + deg}deg, `;
+                currentDeg += deg;
+
+                legend.innerHTML += `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 rounded-full" style="background-color: ${color}"></div>
+                            <span class="text-gray-600 dark:text-gray-300">${cat}</span>
+                        </div>
+                        <span class="font-bold text-gray-800 dark:text-white">${Math.round(pct)}%</span>
+                    </div>
+                `;
+                colorIndex++;
+            });
+
+            gradientStr = gradientStr.slice(0, -2);
+            pieChart.style.background = `conic-gradient(${gradientStr})`;
+        }
+
+        async function loadGoals() {
+            const goals = await getAllRecords('goals');
+            const container = document.getElementById('goals-list');
+            container.innerHTML = '';
+            if(goals.length === 0) container.innerHTML = '<div class="text-center py-5 text-gray-400 dark:text-gray-500 text-sm">Set a goal to start saving!</div>';
+            
+            const txs = await getAllRecords('transactions');
+            const balance = txs.reduce((acc, t) => t.type === 'income' ? acc + t.amount : acc - t.amount, 0);
+
+            goals.forEach(g => {
+                const percentage = Math.min(100, Math.max(0, (balance / g.target) * 100));
+                const card = document.createElement('div');
+                card.className = 'bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700';
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-bold text-gray-800 dark:text-white">${g.name}</h3>
+                        <span class="text-xs font-medium text-emerald-600 dark:text-emerald-400">${Math.round(percentage)}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
+                        <div class="bg-emerald-600 h-2.5 rounded-full" style="width: ${percentage}%"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                        <span>Current: Rs.${balance.toLocaleString()}</span>
+                        <span>Goal: Rs.${g.target.toLocaleString()}</span>
+                    </div>
+                    <button onclick="deleteGoal(${g.id})" class="text-red-400 text-xs mt-3 underline">Remove</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        async function deleteGoal(id) {
+            if(confirm('Delete this goal?')) {
+                await deleteRecord('goals', id);
+                loadGoals();
+            }
+        }
+
+        // --- AI LOGIC ---
+        function sendAIMessage() {
+            const input = document.getElementById('ai-input');
+            const text = input.value.trim();
+            if (!text) return;
+            addMessage(text, 'user');
+            input.value = '';
+            
+            const chatBox = document.getElementById('chat-messages');
+            const loadingId = 'loading-' + Date.now();
+            chatBox.insertAdjacentHTML('beforeend', `<div id="${loadingId}" class="flex flex-col items-start max-w-[85%]"><div class="chat-ai p-3 shadow-sm"><div class="loader"></div></div></div>`);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            setTimeout(() => {
+                document.getElementById(loadingId).remove();
+                let response = "";
+                const lowerText = text.toLowerCase();
+                if (lowerText.includes("job") || lowerText.includes("work")) response = "For job opportunities in Karachi, I recommend checking local listings for 'Sales Representative' or 'Delivery Rider'.";
+                else if (lowerText.includes("business")) response = "Starting a food stall in Karachi (fries/biryani) costs approx Rs. 30,000. Need a breakdown?";
+                else if (lowerText.includes("save")) response = "Try the 50/30/20 rule: 50% Needs, 30% Wants, 20% Savings.";
+                else response = "I can help with budgeting, saving, or business ideas. Ask me anything!";
+                addMessage(response, 'ai');
+            }, 1000);
+        }
+
+        function addMessage(text, sender) {
+            const container = document.getElementById('chat-messages');
+            const align = sender === 'user' ? 'items-end ml-auto' : 'items-start';
+            const bubble = sender === 'user' ? 'chat-user' : 'chat-ai';
+            container.insertAdjacentHTML('beforeend', `
+                <div class="flex flex-col ${align} max-w-[85%]">
+                    <div class="${bubble} p-3 text-sm shadow-sm">${text}</div>
+                    <span class="text-[10px] text-gray-400 mt-1 mx-1">Just now</span>
+                </div>
+            `);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // --- INIT ---
+        window.onload = async () => {
+            initTheme();
+            await initDB();
+            loadDashboard();
+            lucide.createIcons();
+        };
+    </script>
+</body>
+</html>
