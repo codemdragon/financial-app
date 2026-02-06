@@ -1,42 +1,52 @@
-const CACHE_NAME = 'bachat-v1';
+const CACHE_NAME = 'bachat-static-v1';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/bachat_app.html',
-  '/manifest.json',
-  // Tailwind CSS (CDN)
-  'https://cdn.tailwindcss.com',
-  // Lucide Icons (CDN)
-  'https://unpkg.com/lucide@latest',
-  // Google Fonts
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
+    './', // Alias for index
+    './bachat_app.html',
+    './manifest.json',
+    // External CDNs (Critical for functionality)
+    'https://cdn.tailwindcss.com',
+    'https://unpkg.com/lucide@latest',
+    'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
 ];
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(ASSETS))
-  );
+// 1. Install Event: Pre-cache static assets
+self.addEventListener('install', (evt) => {
+    // console.log('Service worker installed');
+    evt.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            console.log('Caching shell assets');
+            return cache.addAll(ASSETS);
+        })
+    );
 });
 
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached response if found
-        if (response) return response;
+// 2. Activate Event: Clean up old caches
+self.addEventListener('activate', (evt) => {
+    // console.log('Service worker activated');
+    evt.waitUntil(
+        caches.keys().then((keys) => {
+            return Promise.all(keys
+                .filter(key => key !== CACHE_NAME)
+                .map(key => caches.delete(key))
+            );
+        })
+    );
+});
 
-        // Otherwise fetch from network
-        return fetch(event.request).then((networkResponse) => {
-          // If the request is for an external asset (fonts, cdn), cache it dynamically
-          if (event.request.url.startsWith('http')) {
-             return caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, networkResponse.clone());
-                return networkResponse;
-             });
-          }
-          return networkResponse;
-        });
-      })
-  );
+// 3. Fetch Event: Network-first strategy for flexibility, fallback to cache
+self.addEventListener('fetch', (evt) => {
+    evt.respondWith(
+        fetch(evt.request)
+            .then((fetchRes) => {
+                return caches.open(CACHE_NAME).then((cache) => {
+                    // Update cache with new version if network succeeds
+                    cache.put(evt.request.url, fetchRes.clone());
+                    return fetchRes;
+                });
+            })
+            .catch(() => {
+                // If offline, return from cache
+                return caches.match(evt.request);
+            })
+    );
 });
