@@ -6,8 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Bachat - Financial Companion</title>
 
+    <!-- Manifest and Theme -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#059669">
+
     <!-- Tailwind CSS -->
-    <script src="./tailwind.min.js"></script>
+    <script src="/tailwind.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -23,10 +27,10 @@
     </script>
 
     <!-- Lucide Icons -->
-    <script src="./lucide.min.js"></script>
+    <script src="/lucide.min.js"></script>
 
     <!-- Local Fonts: Inter -->
-    <link href="./fonts.css" rel="stylesheet">
+    <link href="/fonts.css" rel="stylesheet">
 
     <style>
         body {
@@ -332,6 +336,7 @@
                 <div class="bg-gray-200 dark:bg-gray-700 h-48 flex items-center justify-center relative">
                     <i data-lucide="play-circle" class="w-16 h-16 text-white opacity-80"></i>
                     <img src="https://images.unsplash.com/photo-1556740758-90de374c12ad?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+                        loading="lazy" crossorigin="anonymous"
                         class="absolute inset-0 w-full h-full object-cover opacity-90 mix-blend-overlay">
                 </div>
                 <div class="p-4">
@@ -346,6 +351,7 @@
                 <div class="bg-gray-200 dark:bg-gray-700 h-48 flex items-center justify-center relative">
                     <i data-lucide="play-circle" class="w-16 h-16 text-white opacity-80"></i>
                     <img src="https://images.unsplash.com/photo-1542744173-8e7e53415bb0?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"
+                        loading="lazy" crossorigin="anonymous"
                         class="absolute inset-0 w-full h-full object-cover opacity-90 mix-blend-overlay">
                 </div>
                 <div class="p-4">
@@ -504,6 +510,15 @@
     </div>
 
     <script>
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('SW Registered', reg))
+                    .catch(err => console.error('SW Registration Failed', err));
+            });
+        }
+
         // --- 1. CONFIGURATION & STATE ---
         let currentType = 'expense';
         let db;
